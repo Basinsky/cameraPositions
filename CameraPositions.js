@@ -4,7 +4,7 @@
 //  Created by Basinsky on 5 Mar 2021
 //  
 //  script to setup camera's for an event 
-//  press shift + F1 to F12 on the keyboard to create a camera at the position of the current Vircadia Camera
+//  press shift + F1 to F12 on the keyboard to create a camera at the position of the current Overte Camera
 //  press F1 to F12 to switch between camera points if they exist
 //  press n to quit camera mode
 //  press l to hide/unhide the camera's
