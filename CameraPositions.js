@@ -6,11 +6,12 @@
 //  script to setup camera's for an event 
 //  press shift + F1 to F12 on the keyboard to create a camera at the position of the current Overte Camera
 //  press F1 to F12 to switch between camera points if they exist
+//  press c to change audi mode (Avatar-Camera)
 //  press n to quit camera mode
 //  press l to hide/unhide the camera's
 //  press m to update the camera list if you crashed or left the domain and come back
 //  stopping the script will remove the camera's
-//  using numbers on the keypad (4,6) for the y axis and (8,5) for the x axis you can rotate the camera to adjust it while in camera mode 
+//  using numbers on the keypad (4,6) for the y axis and (8,5) for the x axis you can rotate the camera to adjust it
 //  for events make sure to put the view on fullscreen from the pulldown menu and disable your audio level meter.
 //
 //  Distributed under the Apache License, Version 2.0.
@@ -27,17 +28,15 @@
     var cameraIDs = [];
     var reset = true;
     var RESET_TIME = 20; 
-    var cameraCounter = 0;
-    var originalCameraMode = Camera.mode;
+    var cameraCounter = 0;    
     var isVisible = true;
     var isFullscreen = false;
-    var isOverlays = true; 
-    var pickPosition = null;
-    var isThroughLens = false;
-    var MESSAGE_SIZE = 200;
+    var isOverlays = true;     
+    var isRunning = false;
+    var isCameraListeningPosition = false;    
     var HALF_CIRCLE_DEGREE = 180;
 
-    //Fill array
+    // Fill array
     for (var i = 0; i < TOTAL_CAMERAS+1; i++) {
         cameraIDs[i] = "X";
     }
@@ -75,15 +74,13 @@
         return newRotation;
     }
 
-    function getCameras() {
-        //print("get Cameras");
+    function getCameras() {        
         for (var i = 0; i < TOTAL_CAMERAS; i++) {
             cameraIDs[i] = "X";
         }
-        allEntities = Entities.findEntities(MyAvatar.position,10000);
+        allEntities = Entities.findEntities(MyAvatar.position, 10000);
         for (var j in allEntities) {
-            var props = Entities.getEntityProperties(allEntities[j]);
-            //print(props.name);
+            var props = Entities.getEntityProperties(allEntities[j]);            
             if (props.name.slice(0,6) === "Camera") {
                 print(props.name);
                 var cameraNumber = parseInt(props.name.slice(6));
@@ -105,7 +102,7 @@
             modelURL: LOCATION_ROOT_URL + "Camera.fbx?" + Date.now(),
             userData: "{ \"grabbableKey\": { \"grabbable\": true, \"triggerable\": false}}" 
         });
-        var textID = Entities.addEntity({
+        Entities.addEntity({
             type: "Text",
             name: "TextCamera" + counter,  
             parentID: cameraID,
@@ -126,7 +123,7 @@
     }
 
     function showCameraView(counter) {   
-
+        isRunning = true;     
         var isFullscreen = Menu.isOptionChecked("Fullscreen");
         if (!isFullscreen) {
             Menu.triggerOption('Fullscreen');
@@ -134,29 +131,20 @@
         var isOverlays = Menu.isOptionChecked("Show Overlays");
         if (isOverlays) {
             Menu.triggerOption('Show Overlays');
-        }
-    
-        Camera.captureMouse = true;	 
-        isThroughLens = true;   
+        }    
+        Camera.captureMouse = true;         
         Camera.mode = "entity";
         Camera.cameraEntity = cameraIDs[counter];
+        // set listener position to camera position
+        Script.setTimeout(function () {
+            MyAvatar.audioListenerMode = MyAvatar.audioListenerModeCustom; 
+            MyAvatar.customListenPosition = Camera.position;
+            MyAvatar.customListenOrientation = Camera.orientation;
+            isCameraListeningPosition = true;            
+        }, 100);        
+
         if (isVisible) {
-            var xposition = Window.innerWidth/2;
-            var yposition = Window.innerHeight/2;
-            var overlayID = Overlays.addOverlay("text", {
-                x: xposition - MESSAGE_SIZE/2,
-                y: yposition - MESSAGE_SIZE/2,
-                width: MESSAGE_SIZE,
-                height: MESSAGE_SIZE,
-                leftMargin: 20,
-                topMargin: 20,
-                text: "F" + counter,
-                font: {size: MESSAGE_SIZE - 50},
-                backgroundColor: {r: 100,g: 100,b: 100}
-            });
-            Script.setTimeout(function () {
-                Overlays.deleteOverlay(overlayID);    
-            }, 1000);
+            showMessage("F" + counter, 150 , 200);         
         }    
     }
 
@@ -183,6 +171,46 @@
             }                    
         }       
     }
+    function toggleListeningMethod() {
+        isCameraListeningPosition = !isCameraListeningPosition;
+        var modeMessage;
+        if (isCameraListeningPosition) {
+            modeMessage = "audio mode:\n\n Camera";
+            Script.setTimeout(function () {                
+                MyAvatar.audioListenerMode = MyAvatar.audioListenerModeCustom; 
+                MyAvatar.customListenPosition = Camera.position;
+                MyAvatar.customListenOrientation = Camera.orientation;
+                isCameraListeningPosition = true;            
+            }, 100);           
+        } else {
+            modeMessage = "audio mode:\n\n Avatar";
+            Script.setTimeout(function () {
+                MyAvatar.audioListenerMode = MyAvatar.audioListenerModeHead;                 
+                isCameraListeningPosition = false;            
+            }, 100);
+           
+        }
+        showMessage(modeMessage, 30 ,200);
+    }
+
+    function showMessage(messageText, fontHeight, size) {        
+        var xposition = Window.innerWidth/2;
+        var yposition = Window.innerHeight/2;
+        var overlayID = Overlays.addOverlay("text", {
+            x: xposition - size/2,
+            y: yposition - size/2,
+            width: size,
+            height: size,
+            leftMargin: 20,
+            topMargin: 20,
+            text: messageText,
+            font: {size: fontHeight},
+            backgroundColor: {r: 100,g: 100,b: 100}
+        });
+        Script.setTimeout(function () {            
+            Overlays.deleteOverlay(overlayID);    
+        }, 1000);
+    }
 
     Script.setInterval(function () {
         reset = true;      
@@ -190,7 +218,7 @@
 
     function keyPressEvent(event) { 
         if (reset) {            
-            if (event.text === "k" ) {
+            if (event.text.toLowerCase() === "k" ) {
                 isFullscreen = Menu.isOptionChecked("Fullscreen");
                 if (!isFullscreen) {
                     Menu.triggerOption('Fullscreen');
@@ -201,12 +229,12 @@
                 }
             }
 
-            if (event.text === "m" ) {
+            if (event.text.toLowerCase() === "m" ) {
                 print("m pressed");
                 getCameras();
             }
 
-            if (event.text === "n" ) {
+            if (event.text.toLowerCase() === "n" ) {
                 isFullscreen = Menu.isOptionChecked("Fullscreen");
                 if (isFullscreen) {
                     Menu.triggerOption('Fullscreen');
@@ -216,9 +244,12 @@
                     Menu.triggerOption('Show Overlays');
                 }
                 Camera.mode = "first person";
-                Camera.captureMouse = false;	    
+                Camera.captureMouse = false;
+                MyAvatar.audioListenerMode = MyAvatar.audioListenerModeHead;
+                isCameraListeningPosition = false; 
+                isRunning = false;          	    
             }
-            if (event.text === "l" ) {
+            if (event.text.toLowerCase() === "l" ) {
                 toggleVisibility();  
             }
             if (event.text === "4" ) {
@@ -236,7 +267,12 @@
             if (event.text === "8" ) {
                 // up
                 rotateCamera(1,0);  
-            }          
+            }
+            if (event.text.toLowerCase() === "c" ) {                
+                if (isRunning) {
+                    toggleListeningMethod();
+                }
+            }                
 
             if (event.text.slice(0,1) === "F" && event.text.length > 1 && event.isShifted) {
                 cameraCounter = (parseInt(event.text.slice(1)));
@@ -276,11 +312,12 @@
             // Entities.deleteEntity(cameraIDs[j]);
         }
         Camera.mode = "first person";
-        Camera.captureMouse = false;	      
+        Camera.captureMouse = false;
+        MyAvatar.audioListenerMode = MyAvatar.audioListenerModeHead;
+        isCameraListeningPosition = false;                           
     });
 
     button.clicked.connect(onClicked);
-    tablet.screenChanged.connect(onScreenChanged);
-    //tablet.webEventReceived.connect(onWebEventReceived);
+    tablet.screenChanged.connect(onScreenChanged);    
     Controller.keyPressEvent.connect(keyPressEvent);
 }());
